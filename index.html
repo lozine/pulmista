@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ticket attivo - Arriva</title>
+    
+    <!-- QRCode.js per la generazione del QR Code -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #1a6b40;
+            color: #333333;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding-bottom: 24px;
+        }
+
+        /* Overlay per la luminosità visiva */
+        .brightness-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.03);
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* Overlay Anti-Screenshot / Blur */
+        .screenshot-protection-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #1a6b40;
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        /* Contenitore stile Mobile Viewport */
+        .app-container {
+            width: 100%;
+            max-width: 480px;
+            background-color: #1a6b40;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        /* HEADER SECTION */
+        .header {
+            position: sticky;
+            top: 0;
+            background-color: #1a6b40;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 16px;
+            z-index: 100;
+        }
+
+        .back-btn {
+            position: absolute;
+            left: 16px;
+            color: #ffffff;
+            font-size: 26px;
+            font-weight: 300;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            line-height: 1;
+        }
+
+        .header-title {
+            color: #ffffff;
+            font-size: 22px;
+            font-weight: 700;
+            line-height: 1.4;
+            letter-spacing: 0.2px;
+            text-align: center;
+        }
+
+        /* CARD CONTAINER & WRAPPER */
+        .card-wrapper {
+            padding: 4px 16px 16px 16px;
+            flex: 1;
+        }
+
+        .card {
+            background-color: #ffffff;
+            border-radius: 20px;
+            padding: 24px 20px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        /* LOGO ARRIVA - Più piccolo e non trascinabile */
+        .logo-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .arriva-logo {
+            height: 24px;
+            width: auto;
+            object-fit: contain;
+            pointer-events: none;
+            -webkit-user-drag: none;
+            user-drag: none;
+        }
+
+        /* MAIN TITLE */
+        .ticket-title {
+            font-size: 22px;
+            font-weight: 800;
+            color: #000000;
+            margin-bottom: 6px;
+            line-height: 1.2;
+            letter-spacing: -0.3px;
+        }
+
+        /* SUBTITLE */
+        .ticket-subtitle {
+            font-size: 14px;
+            font-weight: 400;
+            color: #333333;
+            line-height: 1.45;
+            margin-bottom: 20px;
+        }
+
+        /* ACCORDION / BOX SECTION WITH BORDER */
+        .accordion-item {
+            background-color: #f2f8fa;
+            border: 1px solid #c2e0eb;
+            border-radius: 14px;
+            margin-bottom: 14px;
+            overflow: hidden;
+            box-shadow: 0 2px 6px rgba(0, 82, 90, 0.05);
+        }
+
+        #acc-validation {
+            margin-bottom: 0;
+            border-radius: 14px;
+        }
+
+        .accordion-header {
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .accordion-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .accordion-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #000000;
+            line-height: 1.3;
+        }
+
+        .accordion-chevron-svg {
+            width: 20px;
+            height: 20px;
+            color: #00828a;
+            transition: transform 0.25s ease;
+        }
+
+        .accordion-content {
+            padding: 0 12px 12px 12px;
+            display: block;
+        }
+
+        .accordion-item.closed .accordion-content {
+            display: none;
+        }
+
+        .info-tessera-text {
+            font-size: 14px;
+            font-weight: 400;
+            color: #555555;
+            line-height: 1.5;
+            padding: 8px 4px 12px 4px;
+        }
+
+        /* QR SECTION INSIDE BOX */
+        .qr-card-inner {
+            background-color: #ffffff;
+            border-radius: 12px;
+            border: 1px solid #d8e8ee;
+            padding: 24px 16px 16px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .qr-wrapper {
+            width: 180px;
+            height: 180px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 16px;
+            background-color: #ffffff;
+            pointer-events: none;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        .qr-wrapper img, .qr-wrapper canvas {
+            width: 100% !important;
+            height: 100% !important;
+            pointer-events: none;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        .expand-qr-btn {
+            font-size: 15px;
+            font-weight: 700;
+            color: #214382;
+            line-height: 1.4;
+            text-decoration: underline;
+            cursor: pointer;
+            margin-bottom: 18px;
+            background: none;
+            border: none;
+            font-family: inherit;
+        }
+
+        .live-status-bar {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 8px;
+        }
+
+        .live-time, .live-lock {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #0088cc;
+            font-size: 16px;
+            font-weight: 600;
+            line-height: 1;
+        }
+
+        /* ONDINE ANIMATE - Movimento fluido da Sinistra a Destra */
+        .wave-container {
+            width: 100%;
+            height: 48px;
+            overflow: hidden;
+            margin-top: 10px;
+            margin-bottom: 14px;
+            background-color: #f2f8fa;
+            border-radius: 8px;
+            position: relative;
+        }
+
+        .wave-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 300%;
+            height: 100%;
+            background-image: url('waves.png');
+            background-repeat: repeat-x;
+            background-size: auto 100%;
+            animation: wave-left-to-right 6s linear infinite;
+            will-change: transform;
+        }
+
+        @keyframes wave-left-to-right {
+            0% {
+                transform: translateX(-33.3333%);
+            }
+            100% {
+                transform: translateX(0%);
+            }
+        }
+
+        /* ROUTE BANNER */
+        .route-banner {
+            background-color: #1a6b40;
+            border-radius: 12px;
+            padding: 16px 20px;
+            color: #ffffff;
+            margin-top: 12px;
+            margin-bottom: 20px;
+        }
+
+        .route-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #ffffff;
+            line-height: 1.4;
+            margin-bottom: 2px;
+        }
+
+        .route-validity {
+            font-size: 14px;
+            font-weight: 400;
+            color: #ffffff;
+            line-height: 1.4;
+        }
+
+        /* INFO DETAILS SECTION */
+        .info-row {
+            margin-bottom: 16px;
+        }
+
+        .info-label-muted {
+            font-size: 13px;
+            font-weight: 400;
+            color: #777777;
+            line-height: 1.4;
+        }
+
+        .info-value-bold {
+            font-size: 15px;
+            font-weight: 700;
+            color: #000000;
+            line-height: 1.4;
+        }
+
+        .info-value-muted {
+            font-size: 15px;
+            font-weight: 400;
+            color: #777777;
+            line-height: 1.4;
+        }
+
+        .cost-label {
+            font-size: 18px;
+            font-weight: 400;
+            color: #333333;
+            line-height: 1.4;
+        }
+
+        .cost-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #000000;
+            line-height: 1.2;
+        }
+
+        .info-row-flex {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        /* Riga divisoria sottile grigia */
+        .divider-line {
+            width: 100%;
+            height: 1px;
+            background-color: #e0e0e0;
+            margin-top: 4px;
+            margin-bottom: 16px;
+        }
+
+        /* TRANSFER BUTTON */
+        .action-button-container {
+            padding: 8px 16px 24px 16px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .transfer-btn {
+            width: 90%;
+            background-color: #2a1f6d;
+            color: #ffffff;
+            border: none;
+            border-radius: 30px;
+            padding: 14px 24px;
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1.4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            transition: transform 0.1s ease, background-color 0.2s ease;
+        }
+
+        .transfer-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* MODAL QR */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-qr-container {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 90%;
+        }
+
+        .modal-qr-wrapper {
+            width: 280px;
+            height: 280px;
+        }
+
+        .modal-close-btn {
+            margin-top: 20px;
+            background: none;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            color: #333333;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Overlay Luminosità -->
+    <div class="brightness-overlay"></div>
+
+    <!-- Overlay Anti-Screenshot -->
+    <div class="screenshot-protection-overlay" id="protection-overlay">
+        Schermata protetta
+    </div>
+
+    <div class="app-container">
+
+        <!-- Header -->
+        <header class="header">
+            <button class="back-btn" aria-label="Torna indietro">&lt;</button>
+            <h1 class="header-title">Ticket attivo</h1>
+        </header>
+
+        <!-- Main Card Wrapper -->
+        <main class="card-wrapper">
+            <div class="card">
+
+                <!-- Logo Arriva (Non trascinabile e ridimensionato) -->
+                <div class="logo-container">
+                    <img src="arriva.png" alt="Arriva" class="arriva-logo" draggable="false" onerror="this.onerror=null; this.src='https://placehold.co/180x50/transparent/00828a?text=arriva';">
+                </div>
+
+                <!-- Titolo & Sottotitolo -->
+                <h2 class="ticket-title">Abbonamento Annuale Studenti</h2>
+                <p class="ticket-subtitle">Abbonamento annuale studenti valido sulla rete extraurbana Arriva</p>
+
+                <!-- Box 1: Informazioni tessera -->
+                <div class="accordion-item closed" id="acc-info">
+                    <div class="accordion-header" onclick="toggleAccordion('acc-info')">
+                        <div class="accordion-header-left">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0d3b66" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="4" width="20" height="16" rx="2"/>
+                                <circle cx="8" cy="10" r="3"/>
+                                <path d="M15 8h2"/>
+                                <path d="M15 12h2"/>
+                                <path d="M7 16c1.5-1 3.5-1 5 0"/>
+                            </svg>
+                            <span class="accordion-title">Informazioni tessera</span>
+                        </div>
+                        <svg class="accordion-chevron-svg" id="acc-info-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="info-tessera-text">
+                            Tessera Studente attiva e verificata.<br>
+                            Profilo: Studente Rete Extraurbana Arriva.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Box 2: Controllo e validazione -->
+                <div class="accordion-item open" id="acc-validation">
+                    <div class="accordion-header" onclick="toggleAccordion('acc-validation')">
+                        <div class="accordion-header-left">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0d3b66" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z"/>
+                                <path d="M13 5v14" stroke-dasharray="2 2"/>
+                            </svg>
+                            <span class="accordion-title">Controllo e validazione</span>
+                        </div>
+                        <svg class="accordion-chevron-svg" id="acc-validation-chevron" style="transform: rotate(180deg);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </div>
+
+                    <div class="accordion-content">
+                        <div class="qr-card-inner">
+                            <div class="qr-wrapper" id="qrcode"></div>
+
+                            <button class="expand-qr-btn" onclick="openModal()">Ingrandisci QRCode</button>
+
+                            <div class="live-status-bar">
+                                <div class="live-time">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0088cc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <polyline points="12 6 12 12 16 14"/>
+                                    </svg>
+                                    <span id="live-clock">18:42:03</span>
+                                </div>
+                                <div class="live-lock">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0088cc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                    </svg>
+                                    <span id="random-lock-code">102</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wave Decoration (waves.png) - Scorrimento continuo da sinistra a destra -->
+                <div class="wave-container" aria-hidden="true">
+                    <div class="wave-background"></div>
+                </div>
+
+                <!-- Route Banner -->
+                <div class="route-banner">
+                    <div class="route-title">Da BOLGARE a BERGAMO</div>
+                    <div class="route-validity">Valido dal 15/09/2026 a 31/08/2027</div>
+                </div>
+
+                <!-- Info Details Section -->
+                <div class="info-row">
+                    <div class="info-label-muted">Emesso il:</div>
+                    <div class="info-value-bold">26/08/2026 - 18:09</div>
+                </div>
+
+                <div class="info-row-flex">
+                    <span class="cost-label">Costo</span>
+                    <span class="cost-value">553,00 €</span>
+                </div>
+
+                <!-- Riga sottile grigia di separazione tra Costo e Codice Ticket -->
+                <div class="divider-line"></div>
+
+                <div class="info-row-flex" style="margin-bottom: 0;">
+                    <span class="info-label-muted">Codice Ticket:</span>
+                    <span class="info-value-muted" id="ticket-code-display">----W------</span>
+                </div>
+
+            </div>
+        </main>
+
+        <!-- Transfer Button -->
+        <footer class="action-button-container">
+            <button class="transfer-btn" onclick="handleTransfer()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+                <span>Trasferisci ticket</span>
+            </button>
+        </footer>
+
+    </div>
+
+    <!-- Modal Zoom QR -->
+    <div class="modal-overlay" id="qrModal" onclick="closeModal()">
+        <div class="modal-qr-container" onclick="event.stopPropagation()">
+            <div class="modal-qr-wrapper" id="modal-qrcode"></div>
+            <button class="modal-close-btn" onclick="closeModal()">Chiudi</button>
+        </div>
+    </div>
+
+    <script>
+        function generateRandomDigits(length) {
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += Math.floor(Math.random() * 10);
+            }
+            return result;
+        }
+
+        // Generazione del Codice Ticket: 4 numeri + 'W' + 6 numeri
+        const ticketCode = generateRandomDigits(4) + "W" + generateRandomDigits(6);
+        document.getElementById('ticket-code-display').textContent = ticketCode;
+
+        // Generazione QR Code principale (180x180)
+        new QRCode(document.getElementById("qrcode"), {
+            text: ticketCode,
+            width: 180,
+            height: 180,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+        });
+
+        // Generazione QR Code nel modal (280x280)
+        new QRCode(document.getElementById("modal-qrcode"), {
+            text: ticketCode,
+            width: 280,
+            height: 280,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+        });
+
+        // Orologio in tempo reale
+        function updateLiveTime() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('live-clock').textContent = `${hours}:${minutes}:${seconds}`;
+        }
+        setInterval(updateLiveTime, 1000);
+        updateLiveTime();
+
+        // Numero Lock random a 3 cifre
+        document.getElementById('random-lock-code').textContent = Math.floor(Math.random() * 900) + 100;
+
+        // Toggle Accordion Box
+        function toggleAccordion(id) {
+            const item = document.getElementById(id);
+            const chevron = document.getElementById(id + '-chevron');
+            
+            if (item.classList.contains('open')) {
+                item.classList.remove('open');
+                item.classList.add('closed');
+                chevron.style.transform = 'rotate(0deg)';
+            } else {
+                item.classList.remove('closed');
+                item.classList.add('open');
+                chevron.style.transform = 'rotate(180deg)';
+            }
+        }
+
+        // Modal QR Controls
+        function openModal() {
+            document.getElementById('qrModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('qrModal').classList.remove('active');
+        }
+
+        function handleTransfer() {
+            // Nessuna azione eseguita
+        }
+
+        /* SCREEN WAKE LOCK */
+        let wakeLock = null;
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.log('Wake Lock non supportato o rifiutato');
+            }
+        }
+        requestWakeLock();
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                requestWakeLock();
+            }
+        });
+
+        /* PROTEZIONE ANTI-SCREENSHOT */
+        const overlay = document.getElementById('protection-overlay');
+
+        window.addEventListener('blur', () => {
+            overlay.style.display = 'flex';
+        });
+
+        window.addEventListener('focus', () => {
+            overlay.style.display = 'none';
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (
+                e.key === 'PrintScreen' ||
+                (e.ctrlKey && e.key === 'p') ||
+                (e.metaKey && e.shiftKey && (e.key === '3' || e.key === '4' || e.key === '5'))
+            ) {
+                e.preventDefault();
+                overlay.style.display = 'flex';
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                }, 2000);
+            }
+        });
+
+        document.addEventListener('contextmenu', (e) => e.preventDefault());
+    </script>
+</body>
+</html>
